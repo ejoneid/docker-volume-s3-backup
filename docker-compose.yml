@@ -1,0 +1,17 @@
+services:
+  test-service:
+    image: alpine:latest
+    container_name: test-hello-world
+    command: sh -c "while true; do echo 'Hello World!'; sleep 30; done"
+    volumes:
+      - test-volume-1:/data
+      - test-volume-2:/app/config
+      - test-volume-3:/var/log/app
+
+volumes:
+  test-volume-1:
+    driver: local
+  test-volume-2:
+    driver: local
+  test-volume-3:
+    driver: local

@@ -1,0 +1,15 @@
+{
+  "name": "docker-volume-s3-backup",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun build --compile ./index.ts --outfile docker-volume-s3-backup"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
