@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "run": "bun index.ts 42615dd54c46 test",
     "build": "bun build --compile ./index.ts --outfile docker-volume-s3-backup"
   },
   "devDependencies": {

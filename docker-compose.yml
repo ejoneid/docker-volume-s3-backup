@@ -2,7 +2,7 @@ services:
   test-service:
     image: alpine:latest
     container_name: test-hello-world
-    command: sh -c "while true; do echo 'Hello World!'; sleep 30; done"
+    command: sh -c "echo 'Sample data for volume 1' > /data/sample.txt && echo 'Config data for volume 2' > /app/config/config.txt && while true; do echo 'Hello World!'; sleep 30; done"
     volumes:
       - test-volume-1:/data
       - test-volume-2:/app/config

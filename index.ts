@@ -1,79 +1,68 @@
-import { $ } from "bun";
+import { uploadFile } from "./src/s3";
+import { debugLog, errorAndExit as logAndExit } from "./src/utils";
 
 const [dockerContainerId, backupName] = process.argv.slice(2);
-// const dockerContainerId = args[0];
-// const backupName = args[1];
-if (!dockerContainerId) {
-  console.error("Please provide a Docker container ID");
-  process.exit(1);
-}
-if (!backupName) {
-  console.error("Please provide a backup name");
-  process.exit(1);
-}
+if (!dockerContainerId) logAndExit("Please provide a Docker container ID");
+if (!backupName) logAndExit("Please provide a backup name");
 
 const inspectResult = Bun.spawnSync(["docker", "inspect", dockerContainerId]);
-
-if (inspectResult.exitCode !== 0) {
-  console.error(
-    `Error inspecting container: ${inspectResult.stderr.toString()}`,
-  );
-  process.exit(1);
-}
+if (inspectResult.exitCode !== 0)
+  logAndExit(`Error inspecting container: ${inspectResult.stderr.toString()}`);
 
 const containerData = JSON.parse(inspectResult.stdout.toString());
+if (!containerData || containerData.length === 0)
+  logAndExit(`Container ${dockerContainerId} not found`);
 
-if (!containerData || containerData.length === 0) {
-  console.error(`Container ${dockerContainerId} not found`);
-  process.exit(1);
-}
-
-// Extract mount points (volume paths) from the container
 const dockerVolumeSourcePaths = containerData[0].Mounts.filter(
   (mount: any) => mount.Type === "volume",
 ).map((mount: any) => mount.Source);
+console.log("Found volume source paths:", dockerVolumeSourcePaths);
 
-console.log("Volume source paths:", dockerVolumeSourcePaths);
-
-// Check if all directories are empty
 let allDirectoriesEmpty = true;
 for (const volumePath of dockerVolumeSourcePaths) {
-  const dirEntries = await Array.fromAsync(
-    new Bun.Glob("*").scan({ cwd: volumePath, dot: true }),
-  );
-  if (dirEntries.length > 0) {
+  debugLog(`Checking directory: ${volumePath}`);
+  // Try to read directory with sudo since Docker volumes require elevated permissions
+  const lsResult = Bun.spawnSync(["sudo", "ls", "-A", volumePath]);
+  if (lsResult.exitCode !== 0) {
+    logAndExit(
+      `Error: Cannot access ${volumePath}. ${lsResult.stderr.toString()}`,
+    );
+  }
+  const output = lsResult.stdout.toString().trim();
+  if (output.length > 0) {
     allDirectoriesEmpty = false;
+    debugLog(`Directory ${volumePath} is not empty`);
     break;
   }
 }
 
-if (allDirectoriesEmpty) {
-  console.error("Error: All volume directories are empty. Nothing to backup.");
-  process.exit(1);
-}
+if (allDirectoriesEmpty)
+  logAndExit("Error: All volume directories are empty. Nothing to backup.");
 
-const archiveName = `${backupName}_${Date.now()}.tar.gz`;
+const archiveName = `${backupName}__${new Date().toISOString().replace(/[:.]/g, "-")}__.tar.gz`;
+const tarProcess = Bun.spawnSync([
+  "sudo",
+  "tar",
+  "-c",
+  "-z",
+  "-f",
+  archiveName,
+  ...dockerVolumeSourcePaths,
+]);
 
-console.log(`tar -c -z -f ${archiveName} ${dockerVolumeSourcePaths.join(" ")}`);
-await $`sudo tar -c -z -f ${archiveName} ${dockerVolumeSourcePaths.join(" ")}`;
-
-// Check if the archive is empty (only header, less than 1KB)
 const archiveFile = Bun.file(archiveName);
-const archiveExists = await archiveFile.exists();
-
-if (!archiveExists) {
-  console.error(`Error: Archive ${archiveName} was not created.`);
-  process.exit(1);
-}
+if (!(await archiveFile.exists()))
+  logAndExit(
+    `Error: Archive ${archiveName} was not created.\n${tarProcess.stderr.toString()}`,
+  );
 
 const archiveSize = archiveFile.size;
-if (archiveSize < 1024) {
-  console.error(
+if (archiveSize < 512)
+  logAndExit(
     `Error: Archive ${archiveName} is empty or too small (${archiveSize} bytes).`,
   );
-  process.exit(1);
-}
 
-console.log(
-  `Backup created successfully: ${archiveName} (${archiveSize} bytes)`,
-);
+debugLog(`Archive created successfully: ${archiveName} (${archiveSize} bytes)`);
+
+await uploadFile(archiveFile);
+console.log(`Backup completed successfully`);
