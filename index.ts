@@ -1,30 +1,47 @@
 import { uploadFile } from "./src/s3";
-import { debugLog, errorAndExit as logAndExit } from "./src/utils";
+import {
+  debugLog,
+  errorAndExit,
+  getVolumeMountPointsFromProc,
+  getVolumeMountsFromDockerInspect,
+  has2Args,
+} from "./src/utils";
 
-const [dockerContainerId, backupName] = process.argv.slice(2);
-if (!dockerContainerId) logAndExit("Please provide a Docker container ID");
-if (!backupName) logAndExit("Please provide a backup name");
+const args = process.argv.slice(2);
+if (args.length > 2) {
+  errorAndExit(
+    "Usage: docker-volume-s3-backup <backup-name> [container-id]\n" +
+      "  When run inside a container: docker-volume-s3-backup <backup-name>\n" +
+      "  When run on the host: docker-volume-s3-backup <backup-name> <container-id>",
+  );
+}
 
-const inspectResult = Bun.spawnSync(["docker", "inspect", dockerContainerId]);
-if (inspectResult.exitCode !== 0)
-  logAndExit(`Error inspecting container: ${inspectResult.stderr.toString()}`);
+const backupName = args[0];
+let directoriesToBackup: string[];
 
-const containerData = JSON.parse(inspectResult.stdout.toString());
-if (!containerData || containerData.length === 0)
-  logAndExit(`Container ${dockerContainerId} not found`);
+if (has2Args(args)) {
+  const dockerContainerId = args[1];
+  console.log(
+    `Running in host mode, inspecting container: ${dockerContainerId}`,
+  );
+  directoriesToBackup = getVolumeMountsFromDockerInspect(dockerContainerId);
+} else {
+  console.log(
+    "Running in container mode, reading mounts from /proc/self/mountinfo",
+  );
+  directoriesToBackup = await getVolumeMountPointsFromProc();
+}
 
-const dockerVolumeSourcePaths = containerData[0].Mounts.filter(
-  (mount: any) => mount.Type === "volume",
-).map((mount: any) => mount.Source);
-console.log("Found volume source paths:", dockerVolumeSourcePaths);
+console.log("Found volume paths:", directoriesToBackup);
+if (directoriesToBackup.length === 0) errorAndExit("No volumes found");
 
 let allDirectoriesEmpty = true;
-for (const volumePath of dockerVolumeSourcePaths) {
+for (const volumePath of directoriesToBackup) {
   debugLog(`Checking directory: ${volumePath}`);
   // Try to read directory with sudo since Docker volumes require elevated permissions
   const lsResult = Bun.spawnSync(["sudo", "ls", "-A", volumePath]);
   if (lsResult.exitCode !== 0) {
-    logAndExit(
+    errorAndExit(
       `Error: Cannot access ${volumePath}. ${lsResult.stderr.toString()}`,
     );
   }
@@ -37,7 +54,7 @@ for (const volumePath of dockerVolumeSourcePaths) {
 }
 
 if (allDirectoriesEmpty)
-  logAndExit("Error: All volume directories are empty. Nothing to backup.");
+  errorAndExit("Error: All volume directories are empty. Nothing to backup.");
 
 const archiveName = `${backupName}__${new Date().toISOString().replace(/[:.]/g, "-")}__.tar.gz`;
 const tarProcess = Bun.spawnSync([
@@ -47,18 +64,18 @@ const tarProcess = Bun.spawnSync([
   "-z",
   "-f",
   archiveName,
-  ...dockerVolumeSourcePaths,
+  ...directoriesToBackup,
 ]);
 
 const archiveFile = Bun.file(archiveName);
 if (!(await archiveFile.exists()))
-  logAndExit(
+  errorAndExit(
     `Error: Archive ${archiveName} was not created.\n${tarProcess.stderr.toString()}`,
   );
 
 const archiveSize = archiveFile.size;
 if (archiveSize < 512)
-  logAndExit(
+  errorAndExit(
     `Error: Archive ${archiveName} is empty or too small (${archiveSize} bytes).`,
   );
 
