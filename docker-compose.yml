@@ -20,20 +20,3 @@ volumes:
     driver: local
   test-volume-3:
     driver: local
-# services:
-#   test-service:
-#     image: oven/bun:1-alpine
-#     container_name: test-hello-world
-#     command: sh -c "echo 'Sample data for volume 1' > /data/sample.txt && echo 'Config data for volume 2' > /app/config/config.txt && while true; do echo 'Hello World!'; sleep 600; done"
-#     volumes:
-#       - test-volume-1:/data
-#       - test-volume-2:/app/config
-#       - test-volume-3:/var/log/app
-
-# volumes:
-#   test-volume-1:
-#     driver: local
-#   test-volume-2:
-#     driver: local
-#   test-volume-3:
-#     driver: local
