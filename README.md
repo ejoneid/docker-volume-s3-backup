@@ -11,30 +11,6 @@ A lightweight utility to backup Docker volumes to S3-compatible storage. Can be 
 - ⚡ Built with [Bun](https://bun.sh) for fast performance
 - 🔒 Supports S3 multipart uploads for large backups
 
-## Prerequisites
-
-- [Bun](https://bun.sh) runtime (for local development)
-- Docker (for containerized usage)
-- S3-compatible storage credentials
-
-## Installation
-
-### Using Docker (Recommended)
-
-Build the Docker image:
-
-```bash
-docker build -t docker-volume-backup .
-```
-
-### Local Development
-
-Install dependencies:
-
-```bash
-bun install
-```
-
 ## Configuration
 
 Set the following environment variables for S3 access:
@@ -45,58 +21,51 @@ Set the following environment variables for S3 access:
 - `S3_BACKUP_ENDPOINT` - The S3 endpoint URL
 - `DEBUG` - Set to `true` for verbose logging (optional)
 
-## Usage
+## Quick Start
 
-### Running Inside a Container
-
-This mode automatically detects and backs up all volumes mounted to the container:
+Set version, backup_name and container_id, and execute.
 
 ```bash
-docker run --rm \
-  -v /var/lib/docker/volumes:/var/lib/docker/volumes:ro \
-  -e S3_BACKUP_ACCESS_KEY_ID=your-key \
-  -e S3_BACKUP_SECRET_ACCESS_KEY=your-secret \
-  -e S3_BACKUP_BUCKET_NAME=your-bucket \
-  -e S3_BACKUP_ENDPOINT=https://s3.amazonaws.com \
-  docker-volume-backup my-backup-name
+version=v0.1.0
+backup_name=
+container_id= # (leave empty for container mode)
+arch=$(uname -m)
+wget -O /tmp/temp-binary https://github.com/ejoneid/docker-volume-s3-backup/releases/download/$version/docker-volume-s3-backup-linux-$arch
+chmod +x /tmp/temp-binary
+/tmp/temp-binary $backup_name $container_id
+rm /tmp/temp-binary
 ```
 
-### Running from the Host
+## Permanent Installation
 
-Backup a specific container's volumes by providing the container ID:
+### Prebuilt Binaries (Recommended)
+
+Download the latest prebuilt binary for your platform from the [GitHub Releases](https://github.com/ejoneid/docker-volume-s3-backup/releases) page:
+
+- `docker-volume-s3-backup-linux-x86_64` - For Linux x86_64 systems
+- `docker-volume-s3-backup-linux-aarch64` - For Linux ARM64 systems
+
+Make the binary executable:
 
 ```bash
-bun run index.ts my-backup-name container-id-or-name
+chmod +x docker-volume-s3-backup-linux-x64
 ```
 
-### Using Docker Compose
-
-Create a `docker-compose.yml`:
-
-```yaml
-services:
-  backup:
-    image: docker-volume-backup
-    volumes:
-      - /var/lib/docker/volumes:/var/lib/docker/volumes:ro
-      - app-data:/data
-      - app-config:/config
-    environment:
-      - S3_BACKUP_ACCESS_KEY_ID=${S3_BACKUP_ACCESS_KEY_ID}
-      - S3_BACKUP_SECRET_ACCESS_KEY=${S3_BACKUP_SECRET_ACCESS_KEY}
-      - S3_BACKUP_BUCKET_NAME=${S3_BACKUP_BUCKET_NAME}
-      - S3_BACKUP_ENDPOINT=${S3_BACKUP_ENDPOINT}
-    command: ["my-app-backup"]
-
-volumes:
-  app-data:
-  app-config:
-```
-
-Then run:
+Then run it directly:
 
 ```bash
-docker-compose up backup
+./docker-volume-s3-backup-linux-x64 my-backup-name
+```
+
+### From Source
+
+Alternatively, clone the repository and run with Bun:
+
+```bash
+git clone https://github.com/ejoneid/docker-volume-s3-backup.git
+cd docker-volume-s3-backup
+bun install
+bun run index.ts my-backup-name
 ```
 
 ## How It Works
@@ -109,21 +78,15 @@ docker-compose up backup
 
 ## Development
 
-Build the standalone binary:
+### Prerequisites
 
-```bash
-bun run build
-```
-
-Run with debug logging:
-
-```bash
-DEBUG=true bun run index.ts my-backup
-```
+- [Bun](https://bun.sh) runtime
+- Docker (for container testing)
+- S3-compatible storage credentials
 
 ## License
 
-This project is private and not licensed for public use.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Built With
 

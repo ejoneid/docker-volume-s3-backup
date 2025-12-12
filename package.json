@@ -6,7 +6,7 @@
   "scripts": {
     "run": "bun index.ts 42615dd54c46 test",
     "build": "bun build --compile ./index.ts --outfile dist/docker-volume-s3-backup",
-    "build:all": "bun build --compile --target=bun-linux-x64 ./index.ts --outfile dist/docker-volume-s3-backup-linux-x64 && bun build --compile --target=bun-linux-arm64 ./index.ts --outfile dist/docker-volume-s3-backup-linux-arm64"
+    "build:all": "bun build --compile --target=bun-linux-x86_64 ./index.ts --outfile dist/docker-volume-s3-backup-linux-x86_64 && bun build --compile --target=bun-linux-arm64 ./index.ts --outfile dist/docker-volume-s3-backup-linux-aarch64"
   },
   "devDependencies": {
     "@types/bun": "latest"
