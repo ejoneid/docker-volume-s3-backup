@@ -15,6 +15,19 @@ export function has2Args(args: string[]): args is [string, string] {
   return args.length === 2;
 }
 
+export function dynamicSudo(shouldUseSudo: boolean, args: string[]): string[] {
+  return shouldUseSudo ? ["sudo", ...args] : args;
+}
+
+export function requiredNotUndefined<T>(
+  value: T | undefined,
+  message: string,
+): asserts value is T {
+  if (value === undefined) {
+    errorAndExit(message);
+  }
+}
+
 // Function to get volume mounts using docker inspect (for running from host)
 export function getVolumeMountsFromDockerInspect(
   containerId: string,
