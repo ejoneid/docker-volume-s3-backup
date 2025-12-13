@@ -1,6 +1,7 @@
 import { uploadFile } from "./src/s3";
 import {
   debugLog,
+  dynamicSudo,
   errorAndExit,
   getVolumeMountPointsFromProc,
   getVolumeMountsFromDockerInspect,
@@ -36,14 +37,21 @@ console.log("Found volume paths:", directoriesToBackup);
 if (directoriesToBackup.length === 0) errorAndExit("No volumes found");
 
 let allDirectoriesEmpty = true;
+let shouldUseSudo = false;
 for (const volumePath of directoriesToBackup) {
   debugLog(`Checking directory: ${volumePath}`);
-  // Try to read directory with sudo since Docker volumes require elevated permissions
-  const lsResult = Bun.spawnSync(["sudo", "ls", "-A", volumePath]);
-  if (lsResult.exitCode !== 0) {
-    errorAndExit(
-      `Error: Cannot access ${volumePath}. ${lsResult.stderr.toString()}`,
-    );
+  const lsCommand = dynamicSudo(shouldUseSudo, ["ls", "-A", volumePath]);
+  let lsResult = Bun.spawnSync(lsCommand);
+  const shouldRetryWithSudo: boolean =
+    !shouldUseSudo && lsResult.exitCode !== 0;
+  shouldUseSudo = shouldUseSudo || shouldRetryWithSudo;
+  if (shouldRetryWithSudo) {
+    lsResult = Bun.spawnSync(["sudo", "ls", "-A", volumePath]);
+    if (lsResult.exitCode !== 0) {
+      errorAndExit(
+        `Error: Cannot access ${volumePath}. ${lsResult.stderr.toString()}`,
+      );
+    }
   }
   const output = lsResult.stdout.toString().trim();
   if (output.length > 0) {
@@ -57,8 +65,7 @@ if (allDirectoriesEmpty)
   errorAndExit("Error: All volume directories are empty. Nothing to backup.");
 
 const archiveName = `${backupName}__${new Date().toISOString().replace(/[:.]/g, "-")}__.tar.gz`;
-const tarProcess = Bun.spawnSync([
-  "sudo",
+const tarCommand = dynamicSudo(shouldUseSudo, [
   "tar",
   "-c",
   "-z",
@@ -66,6 +73,7 @@ const tarProcess = Bun.spawnSync([
   archiveName,
   ...directoriesToBackup,
 ]);
+const tarProcess = Bun.spawnSync(tarCommand);
 
 const archiveFile = Bun.file(archiveName);
 if (!(await archiveFile.exists()))

@@ -19,6 +19,7 @@ Set the following environment variables for S3 access:
 - `S3_BACKUP_SECRET_ACCESS_KEY` - Your S3 secret access key
 - `S3_BACKUP_BUCKET_NAME` - The S3 bucket name
 - `S3_BACKUP_ENDPOINT` - The S3 endpoint URL
+- `S3_BACKUP_REGION` - The S3 region (optional)
 - `DEBUG` - Set to `true` for verbose logging (optional)
 
 ## Quick Start
