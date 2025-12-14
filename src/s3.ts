@@ -36,12 +36,23 @@ export async function uploadFile(file: BunFile): Promise<void> {
     partSize: chunkSize,
   });
 
-  for (let offset = 0; offset < file.size; offset += chunkSize) {
-    const chunk = file.slice(offset, offset + chunkSize);
-    const arrayBuffer = await chunk.arrayBuffer();
-    writer.write(new Uint8Array(arrayBuffer));
+  try {
+    for (let offset = 0; offset < file.size; offset += chunkSize) {
+      const chunk = file.slice(offset, offset + chunkSize);
+      const arrayBuffer = await chunk.arrayBuffer();
+      writer.write(new Uint8Array(arrayBuffer));
+      await writer.flush();
+    }
+
     await writer.flush();
+    await writer.end();
+  } catch (error) {
+    await writer.end();
+    throw error;
   }
 
-  await writer.end();
+  const fileWasUploaded = await s3file.exists();
+  if (!fileWasUploaded) {
+    throw new Error("File was not uploaded");
+  }
 }
